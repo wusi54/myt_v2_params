@@ -32,6 +32,8 @@ def init_db():
     c.execute("""CREATE TABLE IF NOT EXISTS pools (
         id TEXT PRIMARY KEY, name TEXT, filename TEXT, path TEXT, region TEXT,
         count INTEGER, created_at TEXT)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS file_index (
+        path TEXT PRIMARY KEY, model TEXT, mtime TEXT, size INTEGER, created_at TEXT)""")
     conn.commit()
     conn.close()
 
@@ -49,6 +51,42 @@ def model_by_name(name):
         if m["model"] == name:
             return m
     return None
+
+def index_output_files():
+    """Scan output/ and index device JSON files into file_index table."""
+    base = os.path.join(ROOT, "output")
+    if not os.path.exists(base):
+        return
+    conn = get_conn()
+    for brand in os.listdir(base):
+        brand_path = os.path.join(base, brand)
+        if not os.path.isdir(brand_path):
+            continue
+        for model in os.listdir(brand_path):
+            model_path = os.path.join(brand_path, model)
+            if not os.path.isdir(model_path):
+                continue
+            model_key = f"{brand}/{model}"
+            for root_, _, fs in os.walk(model_path):
+                for f in fs:
+                    if not f.endswith(".json"):
+                        continue
+                    full = os.path.join(root_, f)
+                    if "manifest" in f or "report" in f or "consistency" in f:
+                        continue
+                    try:
+                        d = json.load(open(full, encoding="utf-8"))
+                        if not isinstance(d, dict) or "env" not in d:
+                            continue
+                    except Exception:
+                        continue
+                    rel = os.path.relpath(full, ROOT)
+                    mtime = datetime.datetime.fromtimestamp(os.path.getmtime(full)).strftime("%Y-%m-%d %H:%M:%S")
+                    size = os.path.getsize(full)
+                    conn.execute("INSERT OR REPLACE INTO file_index (path,model,mtime,size,created_at) VALUES (?,?,?,?,?)",
+                                 (rel, model_key, mtime, size, datetime.datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
 
 def scan_pools_to_db():
     conn = get_conn()

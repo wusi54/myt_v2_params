@@ -240,7 +240,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", default="output.json", help="输出前缀")
     parser.add_argument("-c", "--count", type=int, default=10, help="生成数量")
     parser.add_argument("-s", "--strict-oaid", action="store_true", help="严格模式")
-    parser.add_argument("--no-cell", action="store_true", help="不生成基站")
+        parser.add_argument("--gen-cell", action="store_true", help="生成基站信息（默认不生成）")
     parser.add_argument("--jitter", type=int, default=300, help="时钟微扰秒数（默认300）")
     parser.add_argument("--seed", type=int, default=None, help="随机种子")
     parser.add_argument("--batch-id", default=None, help="批次号")
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     run_fission(args.file, args.output, args.count,
                 strict_oaid=args.strict_oaid,
-                rotate_cell=not args.no_cell,
+                rotate_cell=args.gen_cell,
                 jitter_seconds=args.jitter,
                 seed=args.seed,
                 batch_id=args.batch_id,
