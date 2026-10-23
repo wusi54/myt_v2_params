@@ -8,6 +8,8 @@ import hashlib
 import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.region import (apply_region_to_env, validate_pool_region, build_consistency_report)
+from common.debug_props import ensure_debug_props
+from common.fingerprint_extras import inject_extras, gen_hex64_realistic
 
 def generate_hex(length, uppercase=False):
     chars = "0123456789ABCDEF" if uppercase else "0123456789abcdef"
@@ -45,7 +47,7 @@ def process_and_validate_oaid(sample_oaid, strict_mode=False):
             raise ValueError("strict OAID validation failed")
         return new_uuid
     if len(clean_sample) == 64 and re.match(r'^[0-9a-fA-F]{64}$', clean_sample):
-        return "".join(random.choices("0123456789abcdef", k=64))
+        return gen_hex64_realistic()
     target_len = len(clean_sample) if len(clean_sample) > 0 else 64
     return "".join(random.choices("0123456789abcdef", k=target_len))
 
@@ -142,6 +144,8 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
             child["env"].extend(extra)
 
         apply_region_to_env(child["env"], ip_region)
+        ensure_debug_props(child["env"])
+        inject_extras(child["env"], model_brand="oppo")
 
         if rotate_cell:
             if cell_pool_data:
@@ -225,7 +229,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--count", type=int, default=10, help="生成数量")
     parser.add_argument("-s", "--strict-oaid", action="store_true", help="严格模式")
     parser.add_argument("--no-cell", action="store_true", help="不生成基站")
-    parser.add_argument("--jitter", type=int, default=3600, help="时钟微扰秒数")
+    parser.add_argument("--jitter", type=int, default=300, help="时钟微扰秒数（默认300）")
     parser.add_argument("--seed", type=int, default=None, help="随机种子")
     parser.add_argument("--batch-id", default=None, help="批次号")
     parser.add_argument("--max-count", type=int, default=5000, help="单次生成上限")

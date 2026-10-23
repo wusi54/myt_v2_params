@@ -8,6 +8,9 @@ import hashlib
 import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.region import (apply_region_to_env, validate_pool_region, build_consistency_report)
+from common.debug_props import ensure_debug_props
+from common.fingerprint_extras import inject_extras
+from common.sensor_perturb import perturb_sensors
 
 def generate_hex(length, uppercase=False):
     chars = "0123456789ABCDEF" if uppercase else "0123456789abcdef"
@@ -43,7 +46,7 @@ def gen_phone_number():
     return "+86" + random.choice(prefixes) + "".join(str(random.randint(0,9)) for _ in range(8))
 
 def run_fission(input_file, output_base, copies_count, strict_oaid=False,
-                rotate_cell=True, jitter_seconds=3600, seed=None,
+                rotate_cell=False, jitter_seconds=300, seed=None,
                 batch_id=None, max_count=5000, ip_region=None, write_manifest=True,
                 cell_pool=None):
     if copies_count > max_count:
@@ -139,6 +142,9 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
             child["env"].extend(extra)
 
         apply_region_to_env(child["env"], ip_region)
+        ensure_debug_props(child["env"])
+        inject_extras(child["env"], model_brand="huawei")
+        child["sensors"] = perturb_sensors(child.get("sensors", []))
 
         if rotate_cell:
             if cell_pool_data:
@@ -221,8 +227,8 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", default="output.json", help="输出前缀")
     parser.add_argument("-c", "--count", type=int, default=10, help="生成数量")
     parser.add_argument("-s", "--strict-oaid", action="store_true", help="严格模式")
-    parser.add_argument("--no-cell", action="store_true", help="不生成基站")
-    parser.add_argument("--jitter", type=int, default=3600, help="时钟微扰秒数")
+    parser.add_argument("--gen-cell", action="store_true", help="生成基站信息（默认不生成，保持真机空值）")
+    parser.add_argument("--jitter", type=int, default=300, help="时钟微扰秒数（默认300）")
     parser.add_argument("--seed", type=int, default=None, help="随机种子")
     parser.add_argument("--batch-id", default=None, help="批次号")
     parser.add_argument("--max-count", type=int, default=5000, help="单次生成上限")
@@ -232,7 +238,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     run_fission(args.file, args.output, args.count,
                 strict_oaid=args.strict_oaid,
-                rotate_cell=not args.no_cell,
+                rotate_cell=args.gen_cell,
                 jitter_seconds=args.jitter,
                 seed=args.seed,
                 batch_id=args.batch_id,

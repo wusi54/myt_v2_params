@@ -9,6 +9,8 @@ import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.region import (apply_region_to_env, validate_pool_region, build_consistency_report)
 from common.debug_props import ensure_debug_props
+from common.fingerprint_extras import inject_extras, gen_uuid4, gen_hex64_realistic
+from common.sensor_perturb import perturb_sensors
 
 def generate_hex(length, uppercase=False):
     chars = "0123456789ABCDEF" if uppercase else "0123456789abcdef"
@@ -44,18 +46,18 @@ def process_and_validate_oaid(sample_oaid, strict_mode=False):
     is_all_zero = (set(clean_sample.replace("-", "")) == {'0'}) if clean_sample else True
     if is_all_zero or not clean_sample:
         if "-" in clean_sample or len(clean_sample) == 36:
-            def h(n): return "".join(random.choices("0123456789abcdef", k=n))
-            return f"{h(8)}-{h(4)}-{h(4)}-{h(4)}-{h(12)}"
+            return gen_uuid4()
         width = len(clean_sample) if len(clean_sample) > 0 else 64
+        if width == 64:
+            return gen_hex64_realistic()
         return "".join(random.choices("0123456789abcdef", k=width))
     if "-" in clean_sample and len(clean_sample) == 36 and re.match(r'^[0-9a-fA-F\-]{36}$', clean_sample):
-        def h(n): return "".join(random.choices("0123456789abcdef", k=n))
-        new_uuid = f"{h(8)}-{h(4)}-{h(4)}-{h(4)}-{h(12)}"
+        new_uuid = gen_uuid4()
         if strict_mode and not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', new_uuid):
             raise ValueError("strict OAID validation failed: UUID format")
         return new_uuid
     if len(clean_sample) == 64 and re.match(r'^[0-9a-fA-F]{64}$', clean_sample):
-        new_hex64 = "".join(random.choices("0123456789abcdef", k=64))
+        new_hex64 = gen_hex64_realistic()
         if strict_mode and len(new_hex64) != 64:
             raise ValueError("strict OAID validation failed: length not 64")
         return new_hex64
@@ -63,7 +65,7 @@ def process_and_validate_oaid(sample_oaid, strict_mode=False):
     return "".join(random.choices("0123456789abcdef", k=target_len))
 
 def run_fission(input_file, output_base, copies_count, strict_oaid=False,
-                rotate_cell=True, jitter_seconds=3600, seed=None,
+                rotate_cell=False, jitter_seconds=300, seed=None,
                 batch_id=None, max_count=5000, ip_region=None, write_manifest=True,
                 cell_pool=None):
     if copies_count > max_count:
@@ -166,6 +168,9 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
             child_data["env"].extend(extra_items)
 
         apply_region_to_env(child_data["env"], ip_region)
+        ensure_debug_props(child_data["env"])
+        inject_extras(child_data["env"], model_brand="oppo")
+        child_data["sensors"] = perturb_sensors(child_data.get("sensors", []))
 
         if rotate_cell:
             if cell_pool_data:
@@ -253,7 +258,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--count", type=int, default=10, help="生成数量")
     parser.add_argument("-s", "--strict-oaid", action="store_true", help="开启 OAID 严格校验")
     parser.add_argument("--no-cell", action="store_true", help="不生成基站信息")
-    parser.add_argument("--jitter", type=int, default=3600, help="时钟微扰秒数")
+    parser.add_argument("--jitter", type=int, default=300, help="时钟微扰秒数（默认300）")
     parser.add_argument("--seed", type=int, default=None, help="随机种子（可复现）")
     parser.add_argument("--batch-id", default=None, help="批次号（文件名/清单）")
     parser.add_argument("--max-count", type=int, default=5000, help="单次生成上限保护")
@@ -263,7 +268,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     run_fission(args.file, args.output, args.count,
                 strict_oaid=args.strict_oaid,
-                rotate_cell=not args.no_cell,
+                rotate_cell=args.gen_cell,
                 jitter_seconds=args.jitter,
                 seed=args.seed,
                 batch_id=args.batch_id,

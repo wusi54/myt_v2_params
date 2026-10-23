@@ -60,7 +60,7 @@
         </div>
         <div class="checks">
           <label><input type="checkbox" id="genStrict"> 严格 OAID 校验</label>
-          <label><input type="checkbox" id="genNoCell"> 不生成基站</label>
+          <label><input type="checkbox" id="genGenCell"> 生成基站信息（默认不生成）</label>
         </div>
         <div class="actions">
           <button class="btn primary" id="btnGen">开始生成</button>
@@ -396,7 +396,7 @@ async function generate() {
     ip_region: $("genRegion").value || null,
     cell_pool: $("genPool").value || null,
     strict_oaid: $("genStrict").checked,
-    no_cell: $("genNoCell").checked,
+    gen_cell: $("genGenCell").checked,
   };
   const res = await fetch("/api/generate", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
   const data = await res.json();

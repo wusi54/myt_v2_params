@@ -97,8 +97,8 @@ def run_generation(task_id, model, params):
     cmd = [PYTHON, script, "-f", template, "-o", out_prefix, "-c", str(params.get("count", 10))]
     if params.get("strict_oaid"):
         cmd.append("-s")
-    if params.get("no_cell"):
-        cmd.append("--no-cell")
+    if params.get("gen_cell"):
+        cmd.append("--gen-cell")
     cmd += ["--jitter", str(params.get("jitter", 3600))]
     if params.get("seed") not in (None, ""):
         cmd += ["--seed", str(params["seed"])]
@@ -315,7 +315,7 @@ def api_generate():
         "seed": data.get("seed"),
         "batch_id": data.get("batch_id"),
         "strict_oaid": bool(data.get("strict_oaid", False)),
-        "no_cell": bool(data.get("no_cell", False)),
+        "gen_cell": bool(data.get("gen_cell", False)),
         "jitter": int(data.get("jitter", 3600)),
         "max_count": int(data.get("max_count", 5000)),
         "ip_region": data.get("ip_region"),
