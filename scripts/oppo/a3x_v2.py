@@ -22,12 +22,16 @@ def mutate_mac_pair():
     b4 = random.randint(0, 255)
     b5 = random.randint(0, 255)
     b6 = random.randint(0, 255)
-    # BT MAC must NOT be adjacent to WiFi MAC (risk control strong feature)
+    # BT MAC uses fully independent bytes (not adjacent, not same)
+    b4_bt = random.randint(0, 255)
+    b5_bt = random.randint(0, 255)
     b6_bt = random.randint(0, 255)
-    while abs(b6_bt - b6) <= 1:
+    while (b4_bt == b4 and b5_bt == b5 and abs(b6_bt - b6) <= 1):
+        b4_bt = random.randint(0, 255)
+        b5_bt = random.randint(0, 255)
         b6_bt = random.randint(0, 255)
     wifi_mac = f"{prefix}:{b4:02X}:{b5:02X}:{b6:02X}".lower()
-    bt_mac = f"{prefix}:{b4:02X}:{b5:02X}:{b6_bt:02X}".lower()
+    bt_mac = f"{prefix}:{b4_bt:02X}:{b5_bt:02X}:{b6_bt:02X}".lower()
     return wifi_mac, bt_mac
 
 def generate_mock_cell_info():
@@ -177,7 +181,7 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         if resolution:
             w, h = (int(x) for x in resolution.split("x"))
             apply_resolution(child_data["env"], w, h)
-        inject_extras(child_data["env"], model_brand="oppo")
+        inject_extras(child_data["env"], model_brand="oppo", serial=new_serial)
         child_data["sensors"] = perturb_sensors(child_data.get("sensors", []))
 
         if rotate_cell:

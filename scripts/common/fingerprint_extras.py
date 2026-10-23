@@ -1,7 +1,9 @@
 """Inject additional fingerprint fields not present in mother templates."""
 import random
 
-WIFI_SSIDS = ["ChinaNet-5G", "CMCC-5G", "CU-5G", "TP-LINK_5G", "FAST_5G", "HUAWEI-5G", "Xiaomi_5G", "OPPO-5G"]
+WIFI_SSIDS = ["ChinaNet-5G", "CMCC-5G", "CU-5G", "TP-LINK_5G", "FAST_5G", "HUAWEI-5G",
+              "Xiaomi_5G", "OPPO-5G", "vivo-5G", "HONOR-5G", "OnePlus-5G", "realme-5G",
+              "ZTE-5G", "ASUS-5G", "Netcore-5G", "Tenda-5G"]
 NETWORK_TYPES = ["WIFI", "4G", "5G"]
 BATTERY_LEVELS = [str(random.randint(20, 100)) for _ in range(5)]
 
@@ -17,7 +19,7 @@ def gen_hex64_realistic():
     rest = "".join(random.choices("0123456789abcdef", k=63))
     return first + rest
 
-def inject_extras(env, model_brand=""):
+def inject_extras(env, model_brand="", serial=None):
     """Inject missing fingerprint fields into env list."""
     existing = {str(it.get("description", "")).lower() for it in env}
 
@@ -27,8 +29,11 @@ def inject_extras(env, model_brand=""):
                         "value": val, key: val})
             existing.add(key.lower())
 
-    # Build.SERIAL (ro.serialno) - may already exist
-    add("ro.serialno", "unknown")
+    # Build.SERIAL (ro.serialno)
+    if serial:
+        add("ro.serialno", serial)
+    else:
+        add("ro.serialno", "unknown")
 
     # WiFi SSID / BSSID
     add("wifi.ssid", random.choice(WIFI_SSIDS))
