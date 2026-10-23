@@ -1,0 +1,57 @@
+{
+  "models": [
+    {
+      "brand": "oppo",
+      "model": "A3x_5G",
+      "template": "OPPO_A3x_5G.dat",
+      "template_path": "templates/oppo/A3x_5G/OPPO_A3x_5G.dat",
+      "script": "scripts/oppo/a3x_v2.py",
+      "output_dir": "output/oppo/A3x_5G",
+      "oaid_format": "hex64",
+      "baseband": "M_V3_P10,M_V3_P10",
+      "status": "optimized"
+    },
+    {
+      "brand": "oppo",
+      "model": "PDY",
+      "template": "oppo01.dat",
+      "template_path": "templates/oppo/PDY/oppo01.dat",
+      "script": "scripts/oppo/pdy.py",
+      "output_dir": "output/oppo/PDY",
+      "baseband": "M_V3_P10,M_V3_P10",
+      "status": "optimized"
+    },
+    {
+      "brand": "vivo",
+      "model": "s10_pro",
+      "template": "vivo_s10_pro_v2121A.dat",
+      "template_path": "templates/vivo/s10_pro/vivo_s10_pro_v2121A.dat",
+      "script": "scripts/vivo/s10.py",
+      "output_dir": "output/vivo/s10_pro",
+      "oaid_format": "hex64",
+      "baseband": "MOLY.NR15.R3.TC19.PR4.SP.V1.P194,MOLY.NR15.R3.TC19.PR4.SP.V1.P194",
+      "status": "optimized"
+    },
+    {
+      "brand": "huawei",
+      "model": "70x",
+      "template": "huawei_70x.dat",
+      "template_path": "templates/huawei/70x/huawei_70x.dat",
+      "script": "scripts/huawei/70x.py",
+      "output_dir": "output/huawei/70x",
+      "baseband": "79533,79533",
+      "status": "optimized"
+    },
+    {
+      "brand": "coolpad",
+      "model": "day3",
+      "template": "coolpad_day3.dat",
+      "template_path": "templates/coolpad/day3/coolpad_day3.dat",
+      "script": "scripts/coolpad/day3.py",
+      "output_dir": "output/coolpad/day3",
+      "oaid_format": "uuid",
+      "baseband": "MOLY.LR12A.R3.MP.V241,MOLY.LR12A.R3.MP.V241",
+      "status": "optimized"
+    }
+  ]
+}

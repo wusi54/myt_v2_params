@@ -1,0 +1,14 @@
+services:
+  myt:
+    build: .
+    container_name: myt_v2_params
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./web/data:/app/web/data
+      - ./output:/app/output
+      - ./templates/cell_pools:/app/templates/cell_pools
+      - ./config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

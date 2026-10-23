@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.vscode/
+*.log
+web/data/
+output/
+templates/cell_pools/
+test_out/
+*.zip

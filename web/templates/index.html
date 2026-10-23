@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>设备指纹裂变管理平台</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">设备指纹裂变管理平台</div>
+    <div class="topbar-right">v2.0 · 本地控制台</div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="dashboard">概览</button>
+    <button class="tab" data-tab="generate">生成任务</button>
+    <button class="tab" data-tab="pools">基站池</button>
+    <!-- <button class="tab" data-tab="schedules">定时任务</button> -->
+    <button class="tab" data-tab="batches">结果批次</button>
+    <button class="tab" data-tab="preview">文件预览</button>
+  </nav>
+
+  <main class="content">
+    <!-- Dashboard -->
+    <section id="tab-dashboard" class="tabpane active">
+      <div class="cards">
+        <div class="stat"><div class="stat-num" id="statModels">0</div><div class="stat-label">机型</div></div>
+        <div class="stat"><div class="stat-num" id="statPools">0</div><div class="stat-label">基站池</div></div>
+        <div class="stat"><div class="stat-num" id="statTasks">0</div><div class="stat-label">任务</div></div>
+        <div class="stat"><div class="stat-num" id="statBatches">0</div><div class="stat-label">批次</div></div>
+      </div>
+      <div class="panel">
+        <h3>最近任务</h3>
+        <div id="recentTasks" class="table-wrap"></div>
+      </div>
+    </section>
+
+    <!-- Generate -->
+    <section id="tab-generate" class="tabpane">
+      <div class="panel">
+        <h3>新建生成任务</h3>
+        <div class="form-grid">
+          <div class="field"><label>机型</label><select id="genModel"></select></div>
+          <div class="field"><label>生成数量</label><input id="genCount" type="number" value="10" min="1"></div>
+          <div class="field"><label>随机种子</label><input id="genSeed" type="number" placeholder="留空随机"></div>
+          <div class="field"><label>批次号</label><input id="genBatch" type="text" placeholder="A / BJ01"></div>
+          <div class="field"><label>时钟微扰(秒)</label><input id="genJitter" type="number" value="3600"></div>
+          <div class="field"><label>最大数量保护</label><input id="genMax" type="number" value="5000"></div>
+          <div class="field"><label>IP 地区</label>
+            <select id="genRegion">
+              <option value="">(不指定)</option>
+              <option>beijing</option><option>shanghai</option><option>guangzhou</option>
+              <option>shenzhen</option><option>hangzhou</option><option>chengdu</option>
+              <option>wuhan</option><option>nanjing</option><option>cn</option>
+            </select>
+          </div>
+          <div class="field"><label>基站池</label><select id="genPool"><option value="">(无 / 随机)</option></select></div>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="genStrict"> 严格 OAID 校验</label>
+          <label><input type="checkbox" id="genNoCell"> 不生成基站</label>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="btnGen">开始生成</button>
+        </div>
+        <div id="genStatus" class="status"></div>
+        <div id="genInfo" class="info"></div>
+        <pre id="genLog" class="log"></pre>
+      </div>
+    </section>
+
+    <!-- Pools -->
+    <section id="tab-pools" class="tabpane">
+      <div class="panel">
+        <h3>立即拉取基站池</h3>
+        <div class="form-grid">
+          <div class="field"><label>目标地区</label>
+            <select id="fetchRegion"></select>
+          </div>
+          <div class="field"><label>运营商</label>
+            <select id="fetchMnc">
+              <option value="-1">全部</option>
+              <option value="0">移动 (0)</option>
+              <option value="1">联通 (1)</option>
+              <option value="3">电信 (3)</option>
+            </select>
+          </div>
+          <div class="field"><label>随机坐标点数</label><input id="fetchPoints" type="number" value="3" min="1"></div>
+          <div class="field"><label>每坐标返回数 (1-10)</label><input id="fetchN" type="number" value="10" min="1" max="10"></div>
+          <div class="field"><label>半径(km)</label><input id="fetchR" type="number" value="1"></div>
+        </div>
+        <div class="checks"><label><input type="checkbox" id="fetchAppend" checked> 追加到已有池</label></div>
+        <div class="actions"><button class="btn primary" id="btnFetchNow">立即拉取</button></div>
+        <div id="fetchStatus" class="status"></div>
+        <div class="info">系统将根据所选地区随机生成目标坐标，拉取真实基站并统一落库（文件名自动生成）。</div>
+      </div>
+
+      <div class="panel">
+        <h3>池列表</h3>
+        <div class="table-wrap" id="poolTable"></div>
+        <h4 style="margin-top:12px;">池预览</h4>
+        <pre id="poolPreview" class="log"></pre>
+      </div>
+    </section>
+
+    <!-- Schedules (temporarily disabled)
+    <section id="tab-schedules" class="tabpane">
+      <div class="panel">
+        <h3>新建定时任务</h3>
+        <div class="form-grid">
+          <div class="field"><label>名称</label><input id="schedName" type="text" value="daily"></div>
+          <div class="field"><label>机型</label><select id="schedModel"></select></div>
+          <div class="field"><label>触发类型</label>
+            <select id="schedType">
+              <option value="cron">Cron 表达式</option>
+              <option value="interval">间隔(分钟)</option>
+            </select>
+          </div>
+          <div class="field"><label>表达式</label><input id="schedExpr" type="text" value="0 2 * * *"></div>
+          <div class="field"><label>数量</label><input id="schedCount" type="number" value="50"></div>
+          <div class="field"><label>种子</label><input id="schedSeed" type="number"></div>
+          <div class="field"><label>批次号</label><input id="schedBatch" type="text"></div>
+          <div class="field"><label>IP 地区</label><input id="schedRegion" type="text"></div>
+          <div class="field"><label>基站池路径</label><input id="schedPool" type="text" placeholder="相对/绝对路径"></div>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="schedStrict"> 严格 OAID</label>
+          <label><input type="checkbox" id="schedNoCell"> 不生成基站</label>
+        </div>
+        <div class="actions"><button class="btn primary" id="btnSchedCreate">创建</button></div>
+        <div id="schedStatus" class="status"></div>
+      </div>
+      <div class="panel">
+        <h3>任务列表</h3>
+        <div class="table-wrap" id="schedTable"></div>
+      </div>
+    </section>
+    -->
+
+    <!-- Batches -->
+    <section id="tab-batches" class="tabpane">
+      <div class="panel">
+        <h3>结果批次 / 任务列表</h3>
+        <div class="actions">
+          <button class="btn" id="btnBatchRefresh">刷新列表</button>
+        </div>
+        <div class="table-wrap" id="batchTable"></div>
+        <div class="row" style="margin-top:12px;">
+          <div style="flex:1;">
+            <h4>Validate 结果</h4>
+            <pre id="validateLog" class="log"></pre>
+          </div>
+          <div style="flex:1;">
+            <h4>Cross Check 结果</h4>
+            <pre id="crossLog" class="log"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Preview -->
+    <section id="tab-preview" class="tabpane">
+      <div class="panel">
+        <h3>真机参数文件列表</h3>
+        <div id="fileTree" class="tree" style="width:100%; max-height:500px;"></div>
+      </div>
+    </section>
+
+    <!-- Modal -->
+    <div id="modalOverlay" class="modal-overlay" onclick="closeModal(event)">
+      <div class="modal-dialog" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span id="modalTitle" class="modal-title"></span>
+          <button class="btn small" onclick="closeModal()">关闭</button>
+        </div>
+        <div class="modal-actions">
+          <button class="btn small" id="modalCopy">复制内容</button>
+          <button class="btn small" id="modalDownload">下载文件</button>
+        </div>
+        <pre id="modalContent" class="log" style="max-height:60vh;"></pre>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let models = [];
+
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  document.querySelectorAll(".tabpane").forEach(p => p.classList.toggle("active", p.id === "tab-" + name));
+}
+
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+async function loadModels() {
+  models = await api("/api/models");
+  const sel = $("genModel");
+  sel.innerHTML = "";
+  models.forEach(m => {
+    const o = document.createElement("option"); o.value = m.model;
+    o.textContent = `${m.brand}/${m.model} [${m.status}]`;
+    sel.appendChild(o);
+  });
+  const ssel = $("schedModel");
+  ssel.innerHTML = "";
+  const po = document.createElement("option"); po.value = "__pool_fetch__"; po.textContent = "基站池拉取 (__pool_fetch__)"; ssel.appendChild(po);
+  models.forEach(m => {
+    const o = document.createElement("option"); o.value = m.model;
+    o.textContent = `${m.brand}/${m.model}`;
+    ssel.appendChild(o);
+  });
+  $("statModels").textContent = models.length;
+  renderRecentTasks();
+}
+
+async function loadRegions() {
+  const regions = await api("/api/regions");
+  const sel = $("fetchRegion");
+  sel.innerHTML = "";
+  regions.forEach(r => {
+    const o = document.createElement("option"); o.value = r; o.textContent = r; sel.appendChild(o);
+  });
+}
+
+async function loadPools() {
+  const pools = await api("/api/pools");
+  const sel = $("genPool");
+  sel.innerHTML = '<option value="">(无 / 随机)</option>';
+  pools.forEach(p => {
+    const o = document.createElement("option"); o.value = p.path;
+    o.textContent = `${p.name} (${p.count} cells, ${p.region || "-"})`;
+    sel.appendChild(o);
+  });
+  $("statPools").textContent = pools.length;
+  renderPoolTable(pools);
+}
+
+function renderPoolTable(pools) {
+  let html = "<table><thead><tr><th>名称</th><th>地区</th><th>数量</th><th>创建时间</th><th>操作</th></tr></thead><tbody>";
+  pools.forEach(p => {
+    html += `<tr><td>${p.name}</td><td>${p.region||"-"}</td><td>${p.count}</td><td>${(p.created_at||"").slice(0,19)}</td>
+      <td><button class="btn small" onclick="previewPool('${p.id}')">预览</button>
+      <button class="btn small danger" onclick="deletePool('${p.id}')">删除</button></td></tr>`;
+  });
+  html += "</tbody></table>";
+  $("poolTable").innerHTML = html;
+}
+
+async function previewPool(id) {
+  const d = await api("/api/pools/" + id + "/preview");
+  $("poolPreview").textContent = JSON.stringify(d, null, 2);
+}
+
+async function deletePool(id) {
+  if (!confirm("确认删除？")) return;
+  await fetch("/api/pools/" + id, {method:"DELETE"});
+  loadPools();
+}
+
+
+async function fetchPoolNow() {
+  $("fetchStatus").textContent = "拉取中...";
+  const payload = {
+    region: $("fetchRegion").value,
+    n: parseInt($("fetchN").value),
+    mnc: $("fetchMnc").value,
+    r: parseInt($("fetchR").value),
+    points: parseInt($("fetchPoints").value),
+    append: $("fetchAppend").checked,
+  };
+  const res = await fetch("/api/pools/fetch-now", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+  const d = await res.json();
+  if (d.error) { $("fetchStatus").textContent = "错误: " + d.error; return; }
+  $("fetchStatus").textContent = "任务: " + d.task_id + " | 坐标: " + (d.coords||[]).map(c=>c.join(",")).join("; ");
+  const poll = setInterval(async () => {
+    const t = await api("/api/task/" + d.task_id);
+    if (t.status !== "running" && t.status !== "queued") {
+      clearInterval(poll);
+      $("fetchStatus").textContent = "状态: " + t.status;
+      loadPools();
+    }
+  }, 1000);
+}
+
+let currentPreviewPath = "";
+async function loadFileTree() {
+  const tree = await api("/api/files/tree");
+  let html = "";
+  for (const [model, files] of Object.entries(tree)) {
+    html += `<details class="tree-group" open>
+      <summary class="tree-folder">${model} (${files.length})</summary>`;
+    files.forEach(f => {
+      const p = (typeof f === 'string') ? f : f.path;
+      const name = p.split("/").pop();
+      const mtime = (typeof f === 'object') ? (f.mtime || "") : "";
+      html += `<div class="tree-file-row">
+        <span class="tree-file" onclick="previewPath('${p}')">${name}</span>
+        <span class="file-time">${mtime}</span>
+        <span class="file-actions">
+          <button class="btn small" onclick="previewPath('${p}')">预览</button>
+          <button class="btn small" onclick="downloadFile('${p}')">下载</button>
+          <button class="btn small danger" onclick="deleteFile('${p}')">删除</button>
+        </span>
+      </div>`;
+    });
+    html += `</details>`;
+  }
+  $("fileTree").innerHTML = html;
+}
+
+async function previewPath(p) {
+  currentPreviewPath = p;
+  const res = await fetch("/api/file?path=" + encodeURIComponent(p));
+  const d = await res.json();
+  $("modalTitle").textContent = p;
+  $("modalContent").textContent = d.content || d.error || "";
+  $("modalOverlay").classList.add("show");
+}
+
+function closeModal(e) {
+  if (e && e.target !== $("modalOverlay")) return;
+  $("modalOverlay").classList.remove("show");
+}
+
+function copyModal() {
+  const text = $("modalContent").textContent;
+  if (!text) { alert("没有可复制的内容"); return; }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.top = "0";
+  ta.style.left = "0";
+  ta.style.width = "1px";
+  ta.style.height = "1px";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  const b = $("modalCopy");
+  if (ok) {
+    const old = b.textContent;
+    b.textContent = "已复制";
+    setTimeout(() => b.textContent = old, 1200);
+  } else {
+    // fallback to clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        const old = b.textContent;
+        b.textContent = "已复制";
+        setTimeout(() => b.textContent = old, 1200);
+      }).catch(() => alert("复制失败，请手动选择文本复制"));
+    } else {
+      alert("复制失败，请手动选择文本复制");
+    }
+  }
+}
+
+function downloadModal() {
+  if (currentPreviewPath) downloadFile(currentPreviewPath);
+}
+
+async function deleteFile(p) {
+  if (!confirm("确认删除 " + p + " ?")) return;
+  const res = await fetch("/api/file/delete", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({path:p})});
+  const d = await res.json();
+  if (d.error) { alert(d.error); return; }
+  $("filePreview").textContent = "";
+  loadFileTree();
+}
+
+function downloadFile(p) {
+  window.open("/api/file/download?path=" + encodeURIComponent(p), "_blank");
+}
+
+async function generate() {
+  const btn = $("btnGen"); btn.disabled = true;
+  $("genStatus").textContent = "生成中...";
+  $("genLog").textContent = "";
+  const payload = {
+    model: $("genModel").value,
+    count: parseInt($("genCount").value),
+    seed: $("genSeed").value ? parseInt($("genSeed").value) : null,
+    batch_id: $("genBatch").value || null,
+    jitter: parseInt($("genJitter").value),
+    max_count: parseInt($("genMax").value),
+    ip_region: $("genRegion").value || null,
+    cell_pool: $("genPool").value || null,
+    strict_oaid: $("genStrict").checked,
+    no_cell: $("genNoCell").checked,
+  };
+  const res = await fetch("/api/generate", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+  const data = await res.json();
+  if (data.error) { $("genStatus").textContent = "错误: " + data.error; btn.disabled=false; return; }
+  $("genStatus").textContent = "任务: " + data.task_id;
+  const poll = setInterval(async () => {
+    const t = await api("/api/task/" + data.task_id);
+    $("genLog").textContent = t.log;
+    if (t.status !== "running" && t.status !== "queued") {
+      clearInterval(poll);
+      $("genStatus").textContent = "状态: " + t.status;
+      btn.disabled = false;
+      loadBatches(); loadTasks();
+    }
+  }, 1000);
+}
+
+async function loadBatches() {
+  const batches = await api("/api/batches");
+  let html = "<table><thead><tr><th>批次路径</th><th>操作</th></tr></thead><tbody>";
+  batches.forEach(b => {
+    html += `<tr><td>${b.path}</td><td>
+      <button class="btn small" onclick="runCheck('validate','${b.path}')">Validate</button>
+      <button class="btn small" onclick="runCheck('cross','${b.path}')">Cross Check</button>
+    </td></tr>`;
+  });
+  html += "</tbody></table>";
+  $("batchTable").innerHTML = html;
+  $("statBatches").textContent = batches.length;
+}
+
+async function runCheck(type, path) {
+  if (!path) return;
+  const targetLog = type === "validate" ? "validateLog" : "crossLog";
+  $(targetLog).textContent = "运行中...";
+  const res = await fetch(type === "validate" ? "/api/validate" : "/api/crosscheck", {
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({path})
+  });
+  const data = await res.json();
+  $(targetLog).textContent = (data.stdout || "") + (data.stderr || "");
+}
+
+async function loadTasks() {
+  const tasks = await api("/api/tasks");
+  $("statTasks").textContent = tasks.length;
+  let html = "<table><thead><tr><th>ID</th><th>机型</th><th>状态</th><th>创建时间</th></tr></thead><tbody>";
+  tasks.slice(0,10).forEach(t => {
+    html += `<tr><td>${t.id}</td><td>${t.model}</td><td>${t.status}</td><td>${(t.created_at||"").slice(0,19)}</td></tr>`;
+  });
+  html += "</tbody></table>";
+  $("recentTasks").innerHTML = html;
+}
+
+async function loadSchedules() {
+  const scheds = await api("/api/schedules");
+  let html = "<table><thead><tr><th>名称</th><th>机型</th><th>触发</th><th>表达式</th><th>启用</th><th>操作</th></tr></thead><tbody>";
+  scheds.forEach(s => {
+    html += `<tr><td>${s.name}</td><td>${s.model}</td><td>${s.trigger_type}</td><td>${s.trigger_expr}</td>
+      <td>${s.enabled ? "是" : "否"}</td>
+      <td><button class="btn small" onclick="toggleSched('${s.id}')">${s.enabled?"停用":"启用"}</button>
+      <button class="btn small danger" onclick="deleteSched('${s.id}')">删除</button></td></tr>`;
+  });
+  html += "</tbody></table>";
+  $("schedTable").innerHTML = html;
+}
+
+async function createSchedule() {
+  const params = {
+    count: parseInt($("schedCount").value),
+    seed: $("schedSeed").value ? parseInt($("schedSeed").value) : null,
+    batch_id: $("schedBatch").value || null,
+    strict_oaid: $("schedStrict").checked,
+    no_cell: $("schedNoCell").checked,
+    ip_region: $("schedRegion").value || null,
+    cell_pool: $("schedPool").value || null,
+  };
+  const payload = {
+    name: $("schedName").value,
+    model: $("schedModel").value,
+    trigger_type: $("schedType").value,
+    trigger_expr: $("schedExpr").value,
+    params: params,
+  };
+  const res = await fetch("/api/schedules", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+  const d = await res.json();
+  $("schedStatus").textContent = d.error ? ("错误: " + d.error) : ("已创建: " + d.id);
+  loadSchedules();
+}
+
+async function toggleSched(id) {
+  await fetch("/api/schedules/" + id + "/toggle", {method:"POST"});
+  loadSchedules();
+}
+
+async function deleteSched(id) {
+  if (!confirm("确认删除？")) return;
+  await fetch("/api/schedules/" + id, {method:"DELETE"});
+  loadSchedules();
+}
+
+async function previewFile() {
+  const path = $("filePath").value;
+  if (!path) return;
+  const res = await fetch("/api/file?path=" + encodeURIComponent(path));
+  const d = await res.json();
+  $("filePreview").textContent = d.content || d.error || "";
+}
+
+window.onload = () => {
+  document.querySelectorAll(".tab").forEach(t => t.onclick = () => switchTab(t.dataset.tab));
+  loadModels();
+  loadRegions();
+  loadPools();
+  loadBatches();
+  loadTasks();
+  loadSchedules();
+  loadFileTree();
+  $("btnGen").onclick = generate;
+  $("btnFetchNow").onclick = fetchPoolNow;
+  $("btnBatchRefresh").onclick = loadBatches;
+  $("btnValidate").onclick = () => runCheck("validate");
+  $("btnCross").onclick = () => runCheck("cross");
+  $("modalCopy").onclick = copyModal;
+  $("modalDownload").onclick = downloadModal;
+  $("btnSchedCreate").onclick = createSchedule;
+};
+</script>
+</body>
+</html>
