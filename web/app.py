@@ -401,6 +401,7 @@ def api_pool_fetch_now():
 def api_files_tree():
     # Only output directory, grouped by model (brand/model)
     # Only include generated device param files (JSON with 'env' key)
+    # Optimized: limit depth and skip large dirs
     base = os.path.join(ROOT, "output")
     tree = {}
     if os.path.exists(base):
@@ -413,23 +414,38 @@ def api_files_tree():
                 if not os.path.isdir(model_path):
                     continue
                 files = []
-                for root_, _, fs in os.walk(model_path):
+                # Walk but break after 3 levels to avoid huge scans
+                for root_, dirs, fs in os.walk(model_path):
+                    depth = root_.replace(model_path, "").count(os.sep)
+                    if depth > 2:
+                        dirs[:] = []
+                        continue
                     for f in fs:
                         if not f.endswith(".json"):
                             continue
                         full = os.path.join(root_, f)
+                        # Quick check: skip manifest/consistency/report
+                        if "manifest" in f or "report" in f or "consistency" in f:
+                            continue
                         try:
-                            d = json.load(open(full, encoding="utf-8"))
-                            if not isinstance(d, dict) or "env" not in d:
+                            # Only read first 200 bytes to check for 'env' key
+                            with open(full, "r", encoding="utf-8") as fh:
+                                head = fh.read(200)
+                            if '"env"' not in head:
                                 continue
                         except Exception:
                             continue
                         rel = os.path.relpath(full, ROOT)
-                        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(full)).strftime("%Y-%m-%d %H:%M:%S")
-                        files.append({"path": rel, "name": f, "mtime": mtime, "size": os.path.getsize(full)})
+                        try:
+                            mtime = datetime.datetime.fromtimestamp(os.path.getmtime(full)).strftime("%Y-%m-%d %H:%M:%S")
+                            size = os.path.getsize(full)
+                        except Exception:
+                            mtime = ""
+                            size = 0
+                        files.append({"path": rel, "name": f, "mtime": mtime, "size": size})
                 key = f"{brand}/{model}"
                 if files:
-                    tree[key] = sorted(files, key=lambda x: x["path"])
+                    tree[key] = sorted(files, key=lambda x: x["path"])[:200]  # cap at 200
     return jsonify(tree)
 
 @app.route("/api/file/download")
@@ -442,6 +458,45 @@ def api_file_download():
         return jsonify({"error": "not found"}), 404
     from flask import send_file
     return send_file(full, as_attachment=True, download_name=os.path.basename(full))
+
+@app.route("/api/files/batch-delete", methods=["POST"])
+def api_batch_delete():
+    data = request.get_json(force=True)
+    paths = data.get("paths", [])
+    if not paths:
+        return jsonify({"error": "paths required"}), 400
+    deleted = 0
+    errors = []
+    for p in paths:
+        full = os.path.join(ROOT, p) if not os.path.isabs(p) else p
+        if not os.path.abspath(full).startswith(os.path.abspath(os.path.join(ROOT, "output"))):
+            errors.append(f"{p}: forbidden"); continue
+        if not os.path.exists(full) or os.path.isdir(full):
+            errors.append(f"{p}: not found"); continue
+        try:
+            os.remove(full); deleted += 1
+        except Exception as e:
+            errors.append(f"{p}: {e}")
+    return jsonify({"deleted": deleted, "errors": errors})
+
+@app.route("/api/files/batch-download", methods=["POST"])
+def api_batch_download():
+    data = request.get_json(force=True)
+    paths = data.get("paths", [])
+    if not paths:
+        return jsonify({"error": "paths required"}), 400
+    import zipfile, io
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in paths:
+            full = os.path.join(ROOT, p) if not os.path.isabs(p) else p
+            if not os.path.exists(full) or os.path.isdir(full):
+                continue
+            zf.write(full, os.path.basename(p))
+    buf.seek(0)
+    from flask import send_file
+    return send_file(buf, mimetype="application/zip", as_attachment=True,
+                    download_name="batch_download.zip")
 
 @app.route("/api/file/delete", methods=["POST"])
 def api_file_delete():
