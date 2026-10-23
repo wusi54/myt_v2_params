@@ -11,6 +11,7 @@ from common.region import (apply_region_to_env, validate_pool_region, build_cons
 from common.debug_props import ensure_debug_props
 from common.resolution import apply_resolution
 from common.fingerprint_extras import inject_extras, gen_hex64_realistic
+from common.sensor_perturb import perturb_sensors
 
 def generate_hex(length, uppercase=False):
     chars = "0123456789ABCDEF" if uppercase else "0123456789abcdef"
@@ -39,6 +40,15 @@ def generate_mock_cell_info():
     tac = random.randint(10000, 50000)
     ci = random.randint(10000000, 99999999)
     return [{"type": "LTE", "mcc": mcc, "mnc": mnc, "tac": tac, "ci": ci}]
+
+def gen_datadiskid():
+    return generate_hex(8, uppercase=True) + "#" + generate_hex(7, uppercase=True)
+
+def vary_cpu_freq(child):
+    for ci in child.get("cpuinfos", []):
+        avail = str(ci.get("availfreq", "")).split()
+        if avail:
+            ci["freq"] = int(random.choice(avail))
 
 def process_and_validate_oaid(sample_oaid, strict_mode=False):
     clean_sample = str(sample_oaid or "").strip()
@@ -134,6 +144,11 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
 
         if "telinfo" in child and isinstance(child["telinfo"], dict):
             child["telinfo"]["oaid"] = new_oaid
+
+        if "sysinfo" in child and isinstance(child["sysinfo"], dict):
+            child["sysinfo"]["datadiskid"] = gen_datadiskid()
+        vary_cpu_freq(child)
+        child["sensors"] = perturb_sensors(child.get("sensors", []))
 
         extra = []
         alias_map = [
