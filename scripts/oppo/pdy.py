@@ -269,7 +269,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch-id", default=None, help="批次号")
     parser.add_argument("--max-count", type=int, default=5000, help="单次生成上限")
     parser.add_argument("--ip-region", default=None, help="目标地区")
-        parser.add_argument("--cell-pool", default=None, help="真实基站池 JSON 文件")
+    parser.add_argument("--cell-pool", default=None, help="真实基站池 JSON 文件")
     parser.add_argument("--oaid-pool", default=None, help="OAID 池 JSON 文件")
     parser.add_argument("--no-manifest", action="store_true", help="不写 manifest")
     parser.add_argument("--resolution", default=None, help="分辨率，格式 WxH，如 720x1280")

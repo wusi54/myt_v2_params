@@ -9,10 +9,10 @@ import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.region import (apply_region_to_env, validate_pool_region, build_consistency_report)
 from common.debug_props import ensure_debug_props
-from common.resolution import apply_resolution
 from common.fingerprint_extras import inject_extras, gen_hex64_realistic
 from common.sensor_perturb import perturb_sensors
 from common.oaid_pool import load_oaid_pool, pick_oaid
+from common.resolution import apply_resolution
 
 def generate_hex(length, uppercase=False):
     chars = "0123456789ABCDEF" if uppercase else "0123456789abcdef"
@@ -23,7 +23,6 @@ def mutate_mac_pair():
     b4 = random.randint(0, 255)
     b5 = random.randint(0, 255)
     b6 = random.randint(0, 255)
-    # BT MAC uses fully independent bytes (not adjacent, not same)
     b4_bt = random.randint(0, 255)
     b5_bt = random.randint(0, 255)
     b6_bt = random.randint(0, 255)
@@ -56,6 +55,8 @@ def process_oaid(sample_oaid, strict_mode=False):
     is_all_zero = (set(clean.replace("-", "")) == {'0'}) if clean else True
     if is_all_zero or not clean:
         width = len(clean) if len(clean) > 0 else 64
+        if width == 64:
+            return gen_hex64_realistic()
         return "".join(random.choices("0123456789abcdef", k=width))
     if len(clean) == 64 and re.match(r'^[0-9a-fA-F]{64}$', clean):
         return gen_hex64_realistic()
@@ -96,23 +97,8 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         else:
             print(f"[WARN] cell pool file not found: {cell_pool}")
 
-    # OAID pool
     oaid_pool_list = load_oaid_pool(oaid_pool) if oaid_pool else []
     oaid_used = set()
-            if ip_region:
-                ok, msg = validate_pool_region(cell_pool, ip_region)
-                if not ok:
-                    print(f"[ERROR] pool/region mismatch: {msg}")
-                    return
-                print(f"[OK] pool/region: {msg}")
-            try:
-                raw = json.load(open(cell_pool, encoding="utf-8"))
-                cell_pool_data = [c for c in raw if c.get("tac") is not None and c.get("ci") is not None]
-                print(f"[INFO] loaded cell pool: {len(cell_pool_data)} cells")
-            except Exception as e:
-                print(f"[WARN] cell pool load failed: {e}")
-        else:
-            print(f"[WARN] cell pool file not found: {cell_pool}")
 
     output_dir = os.path.dirname(output_base) if os.path.dirname(output_base) else "."
     os.makedirs(output_dir, exist_ok=True)
@@ -121,8 +107,7 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
 
     sample_oaid = mother.get("telinfo", {}).get("oaid", "")
 
-    print(f"[START] vivo S10 fission (count: {copies_count}, strict: {strict_oaid}, "
-          f"cell: {rotate_cell}, seed: {seed}, batch: {batch_id})...")
+    print(f"[START] vivo S10 fission (count: {copies_count}, seed: {seed}, batch: {batch_id})...")
 
     generated_files = []
     for i in range(1, copies_count + 1):
@@ -161,10 +146,6 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         if "telinfo" in child and isinstance(child["telinfo"], dict):
             child["telinfo"]["oaid"] = new_oaid
 
-        if "sysinfo" in child and isinstance(child["sysinfo"], dict):
-            child["sysinfo"]["datadiskid"] = gen_datadiskid()
-        vary_cpu_freq(child)
-
         extra = []
         alias_map = [
             ("wifi.interface.mac", wifi_mac),
@@ -184,11 +165,16 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
 
         apply_region_to_env(child["env"], ip_region)
         ensure_debug_props(child["env"])
+        inject_extras(child["env"], model_brand="vivo", serial=new_serial)
+        child["sensors"] = perturb_sensors(child.get("sensors", []))
+
+        if "sysinfo" in child and isinstance(child["sysinfo"], dict):
+            child["sysinfo"]["datadiskid"] = gen_datadiskid()
+        vary_cpu_freq(child)
+
         if resolution:
             w, h = (int(x) for x in resolution.split("x"))
             apply_resolution(child["env"], w, h)
-        inject_extras(child["env"], model_brand="vivo", serial=new_serial)
-        child["sensors"] = perturb_sensors(child.get("sensors", []))
 
         if rotate_cell:
             if cell_pool_data:
@@ -217,9 +203,11 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
             else:
                 child["allcellinfo"] = generate_mock_cell_info()
 
-        fname = f"{base_name}_{batch_ts}_{i:03d}.json"
+        fname = f"{base_name}_{i:03d}.json"
         if batch_id:
             fname = f"{base_name}_{batch_id}_{batch_ts}_{i:03d}.json"
+        else:
+            fname = f"{base_name}_{batch_ts}_{i:03d}.json"
         file_path = os.path.join(output_dir, fname)
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(child, f, indent=4, ensure_ascii=False)
@@ -238,7 +226,7 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         manifest = {
             "model": "vivo/s10_pro",
             "input_file": os.path.basename(input_file),
-            "input_sha256": hashlib.sha256(open(input_file, 'rb').read()).hexdigest(),
+            "input_sha256": hashlib.sha256(open(input_file, "rb").read()).hexdigest(),
             "count": copies_count,
             "seed": seed,
             "batch_id": batch_id,
@@ -252,7 +240,7 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         manifest_path = os.path.join(output_dir, "manifest.json")
         if os.path.exists(manifest_path):
             try:
-                old = json.load(open(manifest_path, encoding='utf-8'))
+                old = json.load(open(manifest_path, encoding="utf-8"))
                 if isinstance(old, list):
                     old.append(manifest); manifest = old
                 elif isinstance(old, dict) and "batches" in old:
@@ -266,21 +254,21 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         print(f"[MANIFEST] {manifest_path}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="vivo S10 Pro 裂变脚本")
+    parser = argparse.ArgumentParser(description="vivo S10 Pro fission script")
     parser.add_argument("-f", "--file", required=True, help="输入母本 JSON")
     parser.add_argument("-o", "--output", default="output.json", help="输出前缀")
     parser.add_argument("-c", "--count", type=int, default=10, help="生成数量")
     parser.add_argument("-s", "--strict-oaid", action="store_true", help="严格模式")
-    parser.add_argument("--gen-cell", action="store_true", help="生成基站信息（默认不生成，保持真机空值）")
+    parser.add_argument("--gen-cell", action="store_true", help="生成基站信息（默认不生成）")
     parser.add_argument("--jitter", type=int, default=300, help="时钟微扰秒数（默认300）")
-    parser.add_argument("--seed", type=int, default=None, help="随机种子（可复现）")
+    parser.add_argument("--seed", type=int, default=None, help="随机种子")
     parser.add_argument("--batch-id", default=None, help="批次号")
-    parser.add_argument("--max-count", type=int, default=5000, help="单次生成上限保护")
-    parser.add_argument("--ip-region", default=None, help="目标地区（记录用）")
+    parser.add_argument("--max-count", type=int, default=5000, help="单次生成上限")
+    parser.add_argument("--ip-region", default=None, help="目标地区")
     parser.add_argument("--cell-pool", default=None, help="真实基站池 JSON 文件")
     parser.add_argument("--oaid-pool", default=None, help="OAID 池 JSON 文件")
-    parser.add_argument("--no-manifest", action="store_true", help="不写 manifest.json")
     parser.add_argument("--resolution", default=None, help="分辨率，格式 WxH，如 720x1280")
+    parser.add_argument("--no-manifest", action="store_true", help="不写 manifest")
     args = parser.parse_args()
     run_fission(args.file, args.output, args.count,
                 strict_oaid=args.strict_oaid,

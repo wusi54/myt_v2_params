@@ -280,7 +280,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", default="output.json", help="输出前缀")
     parser.add_argument("-c", "--count", type=int, default=10, help="生成数量")
     parser.add_argument("-s", "--strict-oaid", action="store_true", help="开启 OAID 严格校验")
-        parser.add_argument("--gen-cell", action="store_true", help="生成基站信息（默认不生成）")
+    parser.add_argument("--gen-cell", action="store_true", help="生成基站信息（默认不生成）")
     parser.add_argument("--jitter", type=int, default=300, help="时钟微扰秒数（默认300）")
     parser.add_argument("--seed", type=int, default=None, help="随机种子（可复现）")
     parser.add_argument("--batch-id", default=None, help="批次号（文件名/清单）")
