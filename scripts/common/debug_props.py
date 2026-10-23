@@ -6,6 +6,8 @@ DEBUG_PROPS = {
     "ro.adb.secure": "1",
     "ro.build.type": "user",
     "ro.build.tags": "release-keys",
+    "persist.sys.timezone": "Asia/Shanghai",
+    "ro.product.locale": "zh-CN",
 }
 
 # 模拟器/调试特征属性（如果存在则移除或设为安全值）

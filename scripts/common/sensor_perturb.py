@@ -6,15 +6,25 @@ NUMERIC_FIELDS = ["MaxRange", "Resolution", "Power", "MinDelay", "MaxDelay",
                   "FifoReservedEventCount", "FifoMaxEventCount"]
 
 def perturb_value(val, pct=0.001):
-    """Add ±pct random perturbation to a numeric value."""
+    """Add ±pct random perturbation to a numeric value. Never negative."""
     if isinstance(val, bool):
         return val
     if isinstance(val, int):
         delta = max(1, int(abs(val) * pct))
-        return val + random.randint(-delta, delta)
+        new_val = val + random.randint(-delta, delta)
+        if val >= 0:
+            new_val = max(0, new_val)
+            if val > 0 and new_val == 0:
+                new_val = 1
+        return new_val
     if isinstance(val, float):
         delta = abs(val) * pct
-        return round(val + random.uniform(-delta, delta), 6)
+        new_val = val + random.uniform(-delta, delta)
+        if val >= 0:
+            new_val = max(0.0, new_val)
+            if val > 0 and new_val == 0.0:
+                new_val = val * 0.001 if val * 0.001 > 0 else 0.000001
+        return round(new_val, 6)
     return val
 
 def perturb_sensors(sensors, pct=0.001):

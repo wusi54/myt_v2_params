@@ -21,9 +21,13 @@ def mutate_mac_pair():
     prefix = "44:6E:E5"  # Huawei 常见 OUI，使用前确认归属
     b4 = random.randint(0, 255)
     b5 = random.randint(0, 255)
-    b6 = random.randint(0, 254)
+    b6 = random.randint(0, 255)
+    # BT MAC must NOT be adjacent to WiFi MAC (risk control strong feature)
+    b6_bt = random.randint(0, 255)
+    while abs(b6_bt - b6) <= 1:
+        b6_bt = random.randint(0, 255)
     wifi_mac = f"{prefix}:{b4:02X}:{b5:02X}:{b6:02X}".lower()
-    bt_mac = f"{prefix}:{b4:02X}:{b5:02X}:{(b6 + 1):02X}".lower()
+    bt_mac = f"{prefix}:{b4:02X}:{b5:02X}:{b6_bt:02X}".lower()
     return wifi_mac, bt_mac
 
 def generate_mock_cell_info():
