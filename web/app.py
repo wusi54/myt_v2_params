@@ -107,6 +107,8 @@ def run_generation(task_id, model, params):
     cmd += ["--max-count", str(params.get("max_count", 5000))]
     if params.get("ip_region"):
         cmd += ["--ip-region", str(params["ip_region"])]
+    if params.get("resolution"):
+        cmd += ["--resolution", str(params["resolution"])]
     if params.get("cell_pool"):
         cmd += ["--cell-pool", str(params["cell_pool"])]
 
@@ -319,6 +321,7 @@ def api_generate():
         "jitter": int(data.get("jitter", 3600)),
         "max_count": int(data.get("max_count", 5000)),
         "ip_region": data.get("ip_region"),
+        "resolution": data.get("resolution"),
         "cell_pool": data.get("cell_pool"),
     }
 

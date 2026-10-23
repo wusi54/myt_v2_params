@@ -9,6 +9,7 @@ import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.region import (apply_region_to_env, validate_pool_region, build_consistency_report)
 from common.debug_props import ensure_debug_props
+from common.resolution import apply_resolution
 from common.fingerprint_extras import inject_extras, gen_uuid4
 from common.sensor_perturb import perturb_sensors
 
@@ -58,7 +59,7 @@ def vary_cpu_freq(child):
 def run_fission(input_file, output_base, copies_count, strict_oaid=False,
                 rotate_cell=False, jitter_seconds=300, seed=None,
                 batch_id=None, max_count=5000, ip_region=None, write_manifest=True,
-                cell_pool=None, no_inject=False):
+                cell_pool=None, no_inject=False, resolution=None):
     if copies_count > max_count:
         print(f"[ERROR] count {copies_count} exceeds max_count {max_count}")
         return
@@ -158,6 +159,9 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
 
         apply_region_to_env(child["env"], ip_region)
         ensure_debug_props(child["env"])
+        if resolution:
+            w, h = (int(x) for x in resolution.split("x"))
+            apply_resolution(child["env"], w, h)
         if not no_inject:
             inject_extras(child["env"], model_brand="coolpad")
         child["sensors"] = perturb_sensors(child.get("sensors", []))
@@ -252,6 +256,7 @@ if __name__ == "__main__":
     parser.add_argument("--ip-region", default=None, help="目标地区")
     parser.add_argument("--cell-pool", default=None, help="真实基站池 JSON")
     parser.add_argument("--no-manifest", action="store_true", help="不写 manifest")
+    parser.add_argument("--resolution", default=None, help="分辨率，格式 WxH，如 720x1280")
     args = parser.parse_args()
     run_fission(args.file, args.output, args.count,
                 strict_oaid=args.strict_oaid,
@@ -263,4 +268,5 @@ if __name__ == "__main__":
                 ip_region=args.ip_region,
                 write_manifest=not args.no_manifest,
                 cell_pool=args.cell_pool,
+                resolution=args.resolution,
                 no_inject=args.no_inject)

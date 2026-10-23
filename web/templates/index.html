@@ -48,6 +48,7 @@
           <div class="field"><label>批次号</label><input id="genBatch" type="text" placeholder="A / BJ01"></div>
           <div class="field"><label>时钟微扰(秒)</label><input id="genJitter" type="number" value="3600"></div>
           <div class="field"><label>最大数量保护</label><input id="genMax" type="number" value="5000"></div>
+          <div class="field"><label>分辨率 (WxH)</label><input id="genResolution" type="text" value="720x1280" placeholder="720x1280"></div>
           <div class="field"><label>IP 地区</label>
             <select id="genRegion">
               <option value="">(不指定)</option>
@@ -452,6 +453,7 @@ async function generate() {
     jitter: parseInt($("genJitter").value),
     max_count: parseInt($("genMax").value),
     ip_region: $("genRegion").value || null,
+    resolution: $("genResolution").value || null,
     cell_pool: $("genPool").value || null,
     strict_oaid: $("genStrict").checked,
     gen_cell: $("genGenCell").checked,
