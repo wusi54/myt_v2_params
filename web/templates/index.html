@@ -387,7 +387,12 @@ async function deleteFile(p) {
 }
 
 function downloadFile(p) {
-  window.open("/api/file/download?path=" + encodeURIComponent(p), "_blank");
+  const a = document.createElement("a");
+  a.href = "/api/file/download?path=" + encodeURIComponent(p);
+  a.download = p.split("/").pop();
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 function getSelectedPaths() {
