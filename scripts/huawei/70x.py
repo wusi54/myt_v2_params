@@ -57,7 +57,7 @@ def gen_phone_number():
 def run_fission(input_file, output_base, copies_count, strict_oaid=False,
                 rotate_cell=False, jitter_seconds=300, seed=None,
                 batch_id=None, max_count=5000, ip_region=None, write_manifest=True,
-                cell_pool=None, resolution=None):
+                cell_pool=None, resolution=None, oaid_pool=None):
     if copies_count > max_count:
         print(f"[ERROR] count {copies_count} exceeds max_count {max_count}")
         return
@@ -245,7 +245,8 @@ if __name__ == "__main__":
     parser.add_argument("--batch-id", default=None, help="批次号")
     parser.add_argument("--max-count", type=int, default=5000, help="单次生成上限")
     parser.add_argument("--ip-region", default=None, help="目标地区")
-    parser.add_argument("--cell-pool", default=None, help="真实基站池 JSON")
+        parser.add_argument("--cell-pool", default=None, help="真实基站池 JSON 文件")
+    parser.add_argument("--oaid-pool", default=None, help="OAID 池 JSON 文件")
     parser.add_argument("--no-manifest", action="store_true", help="不写 manifest")
     parser.add_argument("--resolution", default=None, help="分辨率，格式 WxH，如 720x1280")
     args = parser.parse_args()
@@ -259,4 +260,5 @@ if __name__ == "__main__":
                 ip_region=args.ip_region,
                 write_manifest=not args.no_manifest,
                 cell_pool=args.cell_pool,
-                resolution=args.resolution)
+                resolution=args.resolution,
+                oaid_pool=args.oaid_pool)

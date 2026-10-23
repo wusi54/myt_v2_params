@@ -149,6 +149,8 @@ def run_generation(task_id, model, params):
         cmd += ["--resolution", str(params["resolution"])]
     if params.get("cell_pool"):
         cmd += ["--cell-pool", str(params["cell_pool"])]
+    if params.get("oaid_pool"):
+        cmd += ["--oaid-pool", str(params["oaid_pool"])]
 
     conn.execute("UPDATE tasks SET status=? WHERE id=?", ("running", task_id))
     conn.commit()
@@ -272,6 +274,22 @@ def api_regions():
     from common.region import REGION_CONFIG
     return jsonify(list(REGION_CONFIG.keys()))
 
+@app.route("/api/oaid-pools")
+def api_oaid_pools():
+    base = os.path.join(ROOT, "templates", "oaid_pools")
+    out = []
+    if os.path.exists(base):
+        for f in sorted(os.listdir(base)):
+            if f.endswith(".json"):
+                full = os.path.join(base, f)
+                try:
+                    data = json.load(open(full, encoding="utf-8"))
+                    count = len(data) if isinstance(data, list) else 0
+                except Exception:
+                    count = 0
+                out.append({"name": f, "path": os.path.relpath(full, ROOT), "count": count})
+    return jsonify(out)
+
 @app.route("/api/pools")
 def api_pools():
     conn = get_conn()
@@ -361,6 +379,7 @@ def api_generate():
         "ip_region": data.get("ip_region"),
         "resolution": data.get("resolution"),
         "cell_pool": data.get("cell_pool"),
+        "oaid_pool": data.get("oaid_pool"),
     }
 
     task_id = uuid.uuid4().hex[:8]

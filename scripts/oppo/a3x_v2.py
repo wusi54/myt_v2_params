@@ -11,6 +11,7 @@ from common.region import (apply_region_to_env, validate_pool_region, build_cons
 from common.debug_props import ensure_debug_props
 from common.resolution import apply_resolution
 from common.fingerprint_extras import inject_extras, gen_uuid4, gen_hex64_realistic
+from common.oaid_pool import load_oaid_pool, pick_oaid
 from common.sensor_perturb import perturb_sensors
 
 def generate_hex(length, uppercase=False):
@@ -67,6 +68,8 @@ def process_and_validate_oaid(sample_oaid, strict_mode=False):
         return new_uuid
     if len(clean_sample) == 64 and re.match(r'^[0-9a-fA-F]{64}$', clean_sample):
         new_hex64 = gen_hex64_realistic()
+    elif len(clean_sample) == 32 and re.match(r'^[0-9a-fA-F]{32}$', clean_sample):
+        return "".join(random.choices("0123456789abcdef", k=32))
         if strict_mode and len(new_hex64) != 64:
             raise ValueError("strict OAID validation failed: length not 64")
         return new_hex64
@@ -76,7 +79,7 @@ def process_and_validate_oaid(sample_oaid, strict_mode=False):
 def run_fission(input_file, output_base, copies_count, strict_oaid=False,
                 rotate_cell=False, jitter_seconds=300, seed=None,
                 batch_id=None, max_count=5000, ip_region=None, write_manifest=True,
-                cell_pool=None, resolution=None):
+                cell_pool=None, resolution=None, oaid_pool=None):
     if copies_count > max_count:
         print(f"[ERROR] count {copies_count} exceeds max_count {max_count}")
         return
@@ -109,6 +112,10 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         else:
             print(f"[WARN] cell pool file not found: {cell_pool}")
 
+    # Load OAID pool
+    oaid_pool_list = load_oaid_pool(oaid_pool) if oaid_pool else []
+    oaid_used = set()
+
     output_dir = os.path.dirname(output_base) if os.path.dirname(output_base) else "."
     os.makedirs(output_dir, exist_ok=True)
     base_name = os.path.basename(output_base).replace(".json", "")
@@ -128,7 +135,11 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         new_android_id = generate_hex(16, uppercase=False)
         new_widevine = generate_hex(64, uppercase=False)
         new_serial = "OP4E" + generate_hex(8, uppercase=True)
-        new_oaid = process_and_validate_oaid(sample_oaid, strict_mode=strict_oaid)
+        if oaid_pool_list:
+            picked, oaid_pool_list = pick_oaid(oaid_pool_list, oaid_used)
+            new_oaid = picked if picked else process_and_validate_oaid(sample_oaid, strict_mode=strict_oaid)
+        else:
+            new_oaid = process_and_validate_oaid(sample_oaid, strict_mode=strict_oaid)
 
         time_offset = random.randint(-jitter_seconds, jitter_seconds)
 
@@ -278,6 +289,7 @@ if __name__ == "__main__":
     parser.add_argument("--cell-pool", default=None, help="真实基站池 JSON 文件")
     parser.add_argument("--no-manifest", action="store_true", help="不写 manifest.json")
     parser.add_argument("--resolution", default=None, help="分辨率，格式 WxH，如 720x1280")
+    parser.add_argument("--oaid-pool", default=None, help="OAID 池 JSON 文件（真实 OAID 列表）")
     args = parser.parse_args()
     run_fission(args.file, args.output, args.count,
                 strict_oaid=args.strict_oaid,
@@ -289,4 +301,5 @@ if __name__ == "__main__":
                 ip_region=args.ip_region,
                 write_manifest=not args.no_manifest,
                 cell_pool=args.cell_pool,
-                resolution=args.resolution)
+                resolution=args.resolution,
+                oaid_pool=args.oaid_pool)

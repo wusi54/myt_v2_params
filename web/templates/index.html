@@ -58,6 +58,8 @@
             </select>
           </div>
           <div class="field"><label>基站池</label><select id="genPool"><option value="">(无 / 随机)</option></select></div>
+          <div class="field"><label>OAID 池文件</label>
+            <select id="genOaidPool"><option value="">(无 / 随机生成)</option></select></div>
         </div>
         <div class="checks">
           <label><input type="checkbox" id="genStrict"> 严格 OAID 校验</label>
@@ -234,6 +236,17 @@ async function loadRegions() {
   sel.innerHTML = "";
   regions.forEach(r => {
     const o = document.createElement("option"); o.value = r; o.textContent = r; sel.appendChild(o);
+  });
+}
+
+async function loadOaidPools() {
+  const pools = await api("/api/oaid-pools");
+  const sel = $("genOaidPool");
+  sel.innerHTML = '<option value="">(无 / 随机生成)</option>';
+  pools.forEach(p => {
+    const o = document.createElement("option"); o.value = p.path;
+    o.textContent = `${p.name} (${p.count} oaid)`;
+    sel.appendChild(o);
   });
 }
 
@@ -455,6 +468,7 @@ async function generate() {
     ip_region: $("genRegion").value || null,
     resolution: $("genResolution").value || null,
     cell_pool: $("genPool").value || null,
+    oaid_pool: $("genOaidPool").value || null,
     strict_oaid: $("genStrict").checked,
     gen_cell: $("genGenCell").checked,
   };
@@ -570,6 +584,7 @@ window.onload = () => {
   loadModels();
   loadRegions();
   loadPools();
+  loadOaidPools();
   loadBatches();
   loadTasks();
   loadFileTree();

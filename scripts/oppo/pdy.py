@@ -11,6 +11,7 @@ from common.region import (apply_region_to_env, validate_pool_region, build_cons
 from common.debug_props import ensure_debug_props
 from common.resolution import apply_resolution
 from common.fingerprint_extras import inject_extras, gen_hex64_realistic
+from common.oaid_pool import load_oaid_pool, pick_oaid
 from common.sensor_perturb import perturb_sensors
 
 def generate_hex(length, uppercase=False):
@@ -73,7 +74,7 @@ def process_and_validate_oaid(sample_oaid, strict_mode=False):
 def run_fission(input_file, output_base, copies_count, strict_oaid=False,
                 rotate_cell=True, jitter_seconds=3600, seed=None,
                 batch_id=None, max_count=5000, ip_region=None, write_manifest=True,
-                cell_pool=None, resolution=None):
+                cell_pool=None, resolution=None, oaid_pool=None):
     if copies_count > max_count:
         print(f"[ERROR] count {copies_count} exceeds max_count {max_count}")
         return
@@ -104,6 +105,9 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         else:
             print(f"[WARN] cell pool file not found: {cell_pool}")
 
+    oaid_pool_list = load_oaid_pool(oaid_pool) if oaid_pool else []
+    oaid_used = set()
+
     output_dir = os.path.dirname(output_base) if os.path.dirname(output_base) else "."
     os.makedirs(output_dir, exist_ok=True)
     base_name = os.path.basename(output_base).replace(".json", "")
@@ -121,7 +125,11 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         new_android_id = generate_hex(16, uppercase=False)
         new_widevine = generate_hex(64, uppercase=False)
         new_serial = "OP" + generate_hex(8, uppercase=True)
-        new_oaid = process_and_validate_oaid(sample_oaid, strict_mode=strict_oaid)
+        if oaid_pool_list:
+            picked, oaid_pool_list = pick_oaid(oaid_pool_list, oaid_used)
+            new_oaid = picked if picked else process_and_validate_oaid(sample_oaid, strict_mode=strict_oaid)
+        else:
+            new_oaid = process_and_validate_oaid(sample_oaid, strict_mode=strict_oaid)
 
         time_offset = random.randint(-jitter_seconds, jitter_seconds)
 
@@ -255,13 +263,14 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", default="output.json", help="输出前缀")
     parser.add_argument("-c", "--count", type=int, default=10, help="生成数量")
     parser.add_argument("-s", "--strict-oaid", action="store_true", help="严格模式")
-        parser.add_argument("--gen-cell", action="store_true", help="生成基站信息（默认不生成）")
+    parser.add_argument("--gen-cell", action="store_true", help="生成基站信息（默认不生成）")
     parser.add_argument("--jitter", type=int, default=300, help="时钟微扰秒数（默认300）")
     parser.add_argument("--seed", type=int, default=None, help="随机种子")
     parser.add_argument("--batch-id", default=None, help="批次号")
     parser.add_argument("--max-count", type=int, default=5000, help="单次生成上限")
     parser.add_argument("--ip-region", default=None, help="目标地区")
-    parser.add_argument("--cell-pool", default=None, help="真实基站池 JSON")
+        parser.add_argument("--cell-pool", default=None, help="真实基站池 JSON 文件")
+    parser.add_argument("--oaid-pool", default=None, help="OAID 池 JSON 文件")
     parser.add_argument("--no-manifest", action="store_true", help="不写 manifest")
     parser.add_argument("--resolution", default=None, help="分辨率，格式 WxH，如 720x1280")
     args = parser.parse_args()
@@ -275,4 +284,5 @@ if __name__ == "__main__":
                 ip_region=args.ip_region,
                 write_manifest=not args.no_manifest,
                 cell_pool=args.cell_pool,
-                resolution=args.resolution)
+                resolution=args.resolution,
+                oaid_pool=args.oaid_pool)

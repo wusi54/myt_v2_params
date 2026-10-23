@@ -12,6 +12,7 @@ from common.debug_props import ensure_debug_props
 from common.resolution import apply_resolution
 from common.fingerprint_extras import inject_extras, gen_hex64_realistic
 from common.sensor_perturb import perturb_sensors
+from common.oaid_pool import load_oaid_pool, pick_oaid
 
 def generate_hex(length, uppercase=False):
     chars = "0123456789ABCDEF" if uppercase else "0123456789abcdef"
@@ -64,7 +65,7 @@ def process_oaid(sample_oaid, strict_mode=False):
 def run_fission(input_file, output_base, copies_count, strict_oaid=False,
                 rotate_cell=False, jitter_seconds=300, seed=None,
                 batch_id=None, max_count=5000, ip_region=None, write_manifest=True,
-                cell_pool=None, resolution=None):
+                cell_pool=None, resolution=None, oaid_pool=None):
     if copies_count > max_count:
         print(f"[ERROR] count {copies_count} exceeds max_count {max_count}")
         return
@@ -80,6 +81,24 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
     cell_pool_data = None
     if cell_pool:
         if os.path.exists(cell_pool):
+            if ip_region:
+                ok, msg = validate_pool_region(cell_pool, ip_region)
+                if not ok:
+                    print(f"[ERROR] pool/region mismatch: {msg}")
+                    return
+                print(f"[OK] pool/region: {msg}")
+            try:
+                raw = json.load(open(cell_pool, encoding="utf-8"))
+                cell_pool_data = [c for c in raw if c.get("tac") is not None and c.get("ci") is not None]
+                print(f"[INFO] loaded cell pool: {len(cell_pool_data)} cells")
+            except Exception as e:
+                print(f"[WARN] cell pool load failed: {e}")
+        else:
+            print(f"[WARN] cell pool file not found: {cell_pool}")
+
+    # OAID pool
+    oaid_pool_list = load_oaid_pool(oaid_pool) if oaid_pool else []
+    oaid_used = set()
             if ip_region:
                 ok, msg = validate_pool_region(cell_pool, ip_region)
                 if not ok:
@@ -114,7 +133,11 @@ def run_fission(input_file, output_base, copies_count, strict_oaid=False,
         new_android_id = generate_hex(16, uppercase=False)
         new_widevine = generate_hex(64, uppercase=False)
         new_serial = "VIVO" + generate_hex(8, uppercase=True)
-        new_oaid = process_oaid(sample_oaid, strict_oaid)
+        if oaid_pool_list:
+            picked, oaid_pool_list = pick_oaid(oaid_pool_list, oaid_used)
+            new_oaid = picked if picked else process_oaid(sample_oaid, strict_oaid)
+        else:
+            new_oaid = process_oaid(sample_oaid, strict_oaid)
 
         time_offset = random.randint(-jitter_seconds, jitter_seconds)
 
@@ -255,6 +278,7 @@ if __name__ == "__main__":
     parser.add_argument("--max-count", type=int, default=5000, help="单次生成上限保护")
     parser.add_argument("--ip-region", default=None, help="目标地区（记录用）")
     parser.add_argument("--cell-pool", default=None, help="真实基站池 JSON 文件")
+    parser.add_argument("--oaid-pool", default=None, help="OAID 池 JSON 文件")
     parser.add_argument("--no-manifest", action="store_true", help="不写 manifest.json")
     parser.add_argument("--resolution", default=None, help="分辨率，格式 WxH，如 720x1280")
     args = parser.parse_args()
@@ -268,4 +292,5 @@ if __name__ == "__main__":
                 ip_region=args.ip_region,
                 write_manifest=not args.no_manifest,
                 cell_pool=args.cell_pool,
-                resolution=args.resolution)
+                resolution=args.resolution,
+                oaid_pool=args.oaid_pool)
