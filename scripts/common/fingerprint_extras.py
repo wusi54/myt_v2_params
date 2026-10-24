@@ -53,5 +53,7 @@ def inject_extras(env, model_brand="", serial=None):
 
     # VAID for all (some SDKs check)
     add("vaid", gen_uuid4())
+    # AAID (App Anonymous ID) for all
+    add("aaid", gen_uuid4())
 
     return env

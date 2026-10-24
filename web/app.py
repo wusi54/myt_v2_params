@@ -497,7 +497,7 @@ def api_files_tree():
                             continue
                         rel = os.path.relpath(full, ROOT)
                         try:
-                            mtime = datetime.datetime.fromtimestamp(os.path.getmtime(full)).strftime("%Y-%m-%d %H:%M:%S")
+                            mtime = datetime.datetime.fromtimestamp(os.path.getmtime(full), tz=datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
                             size = os.path.getsize(full)
                         except Exception:
                             mtime = ""
@@ -505,7 +505,7 @@ def api_files_tree():
                         files.append({"path": rel, "name": f, "mtime": mtime, "size": size})
                 key = f"{brand}/{model}"
                 if files:
-                    tree[key] = sorted(files, key=lambda x: x["path"])[:200]  # cap at 200
+                    tree[key] = sorted(files, key=lambda x: x["path"], reverse=True)[:200]  # cap at 200
     return jsonify(tree)
 
 @app.route("/api/file/download")
